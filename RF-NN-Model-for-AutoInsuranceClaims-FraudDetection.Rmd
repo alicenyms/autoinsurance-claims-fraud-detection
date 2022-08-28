@@ -1,0 +1,175 @@
+---
+title: "RF-NN-Model-for-AutoInsuranceClaims-FraudDetection"
+output: html_document
+date: '2022-08-28'
+---
+
+The Auto Insurance Claims Dataset is from:
+https://www.kaggle.com/buntyshah/auto-insurance-claims-data
+
+## 1. Objective
+* to develop two fraud detection models (Random Forest, Neural Network) for Auto Insurance Claims
+* to evaluate and compare their corresponding results using model performance metrics
+
+```{r}
+library(readr)
+library(dplyr)
+library(devtools)
+devtools::install_version("DMwR",version = "0.4.1")
+```
+
+## 2. Data Pre-processing
+
+```{r}
+dataset <- read.csv("/Users/alicenyms/Desktop/Programming/R/auto-insurance-claims-data/insurance_claims.csv")
+#Remove the incident location column and the last unknown column
+dataset = dataset[,c(-25,-40)] 
+dataset = dataset %>% mutate_if(is.character,as.factor) 
+dataset = as.data.frame(dataset)
+round(prop.table(table(dataset$fraud_reported)),2)
+```
+
+
+```{r}
+table(dataset$fraud_reported)
+dataset$policy_bind_date = as.Date(dataset$policy_bind_date) - as.Date("1990-01-08")
+dataset$incident_date = as.Date(dataset$incident_date) - as.Date("2015-01-01") 
+head(dataset)
+```
+```{r}
+library(DMwR)
+set.seed(123)
+newData <- SMOTE(fraud_reported ~ ., dataset, perc.over = 100,perc.under=100)
+```
+
+```{r}
+table(newData$fraud_reported)
+```
+
+## 3. Random Forest Model
+
+In the random forest model, number of trees used in the forest is set to be 500 while number of random variables used in each tree is set to be 37(i.e., all variables of the processed dataset).
+
+```{r}
+library(randomForest)
+library(caret)
+dataset_rf = data.frame(newData)
+train = sample(nrow(dataset_rf), 0.7*nrow(dataset_rf), replace = FALSE)
+TrainSet = dataset_rf[train,]
+TestSet = dataset_rf[-train,]
+```
+
+**Model Performances on Training Data:**
+
+The OOB(Out of Bag) estimate of error rate is 17.95% which refers to the misclassification rate that reflect the accuracy of the model.  
+
+The confusion matrix based on the training data. For 175 total non-fraud data, 119 of them are correctly classified while 56 of them are misclassified. For  343 total fraud data, 306 of them are correctly classified while 37 of them are misclassified. 
+
+It is found that classification error on non-fraud case (i.e., “fraud_reported = N”) is 32.00% while that on fraud case (i.e., “fraud_reported = Y”)  is 10.79%
+
+The performance metrics calculated from the confusion matrix:
+* Accuracy = (119+306)/(119+56+37+306) = 0.8205 
+* Precision = TP/(TP+FP) = 306/(306+56) = 0.8453
+* Recall = TP/(TP+FN) = 306/(306+37) = 0.8921
+* F1 score = 2 * 0.8453 * 0.8921/ (0.8453+0.8921) = 0.8681
+
+```{r}
+set.seed(123)
+model_rf = randomForest(fraud_reported ~ ., data=TrainSet,mtry = 37, ntree=500, importance = TRUE)
+model_rf
+```
+
+**Model Performances on Testing Data:**
+
+The following cell shows the confusion matrix of testing data, for 67 total non-fraud data, 46 of them are correctly classified while 21 of them are misclassified and as for 156 total fraud data, 131 of them are correctly classified while 25 of them are misclassified. 
+
+The performance metrics from the confusion matrix:
+* accuracy = 0.8386
+* Precision = 0.8808
+* Recall = 0.8808
+* F1 score = 0.8808
+
+
+```{r}
+prediction_rf = predict(model_rf,TestSet)
+confusionMatrix(prediction_rf,TestSet$fraud_reported, positive = 'Y',mode = "prec_recall")
+```
+
+From the performance metrics of training data and testing data, it is found that the values of all metrics of testing data are greater or equal to that of testing data, which indicate the performance of results of testing data is better than that of training data and the problem of overfitting do not occur since the model did not only learn well with the training data. 
+
+The cell below shows the variable importance graph from the random forest model, two different rankings of two different criterias (i.e., Mean Decrease in Accuracy and  Mean Decrease Impurity) for measuring the variable importance. 
+
+**With both rankings shown in the graph, attributes - ‘incidient_severity’,  ‘insured_hobbies’, ‘auto_model’, ‘insured_occupation’, ‘auto_make’ can be considered as the important attributes to the model.**
+
+```{r}
+importance(model_rf)
+varImpPlot(model_rf)
+```
+## 4.Neural Network Model
+In the neural network model, maximum 500 of iterations that gives lowest error rate on both train and test data as shown in the below figure is used while the number of units in the hidden layer is 6.
+
+```{r}
+library(nnet)
+```
+
+```{r}
+#Calculate the error and find a best model
+err11=0
+err12=0
+n_tr=dim(TrainSet)[1]
+n_te=dim(TestSet)[1]
+```
+
+```{r}
+set.seed(123)
+for(i in seq(1, 601, 100))
+{
+  model=nnet(fraud_reported ~ ., data=TrainSet,maxit=i,size=6,decay = 0.1)
+  err11[i]=sum(predict(model,TrainSet,type='class')!=TrainSet[,38])/n_tr
+  err12[i]=sum(predict(model,TestSet,type='class')!=TestSet[,38])/n_te
+}
+```
+
+```{r}
+error_1 = na.omit(err11)
+error_2 = na.omit(err12)
+plot(seq(1, 601, 100),error_1,col=1,type="b",ylab="Error rate",xlab="Training epoch",ylim=c(min(min(error_1),min(error_2)),max(max(error_1),max(error_2))))
+lines(seq(1, 601, 100),error_2,col=2,type="b")
+legend("topleft",pch=c(15,15),legend=c("Train","Test"),col=c(1,2),bty="n")
+```
+```{r}
+#Final model and evaluation result
+set.seed(123)
+model_best=nnet(fraud_reported ~ ., data=TrainSet,maxit=500,size=6,decay = 0.1)
+```
+
+The below output shows the training data confusion matrix and its performance metrics. For 175 total non-fraud data, 138 of them are correctly classified while 37 of them are misclassified. For 343 total fraud data, 341 of them are correctly classified while 2 of them are misclassified. It is found that classification error on non-fraud case is 21.14% while that on fraud case is 0.006%. The performance metrics from the confusion matrix are accuracy = 0.9247 ; Precision = 0.9942 ; Recall = 0.9021 ; F1 score = 0.9459. 
+
+```{r}
+#Training Data Confusion Matrix
+prediction_train = predict(model_best,TrainSet,type="class")
+table_train = table(TrainSet$fraud_reported,prediction_train)
+confusionMatrix(table_train, positive = 'Y',mode = "prec_recall")
+```
+
+The below output shows the testing data confusion matrix and its performance metrics. For 72 total non-fraud data, 31 of them are correctly classified while 41 of them are misclassified. For 151 total fraud data, 130 of them are correctly classified while 21 of them are misclassified. The performance metrics from the confusion matrix are accuracy = 0.722 ; Precision = 0.8609; Recall = 0.7602 ; F1 score = 0.8075. 
+
+```{r}
+#Testing Data Confusion Matrix
+prediction_test = predict(model_best,TestSet,type="class")
+table_test = table(TestSet$fraud_reported,prediction_test)
+confusionMatrix(table_test, positive = 'Y',mode = "prec_recall")
+```
+
+From the performance metrics of training data and testing data, it is found that the values of all metrics of training data are much greater than that of testing data, which indicate the performance of results of training data is better than that of training data and the problem of overfitting occur since the model learn so well with the training data. 
+
+## 5.Conclusion
+Random forest model is often compared with neural network model as both can model data with non-linear relationships variables and deal with the interactions between them. Considering the performance of both fraud detection models developed, Random Forest Model is more suitable for this case than Neural Network Model. 
+
+Firstly, the performances of random forest model on unseen data are better than that of neural network model. Based on the performances on testing data of both models, all performance metrics of random forest model are greater than that of neural network model. Moreover, there is no overfitting problem for the random forest model while there is overfitting problem for the neural network model. The performance on training data is much greater than that on testing data for neural network model, and which means the model completely fits the training data but fails to generalize the testing unseen data. Therefore, random forest model is more suitable in this case.
+
+The interpretability of random forest model is much higher than neural network model. Since neural network is known as ‘black-box’ approach, the model itself delivers results without explanation of how they were derived, and the relationship of inputs and outputs are mathematically complex and opaque. For random forest model, although it consists of an ensemble of individual decision trees which makes it unclear to know the rules from a particular decision tree, we can use the variable importance to understand the internal workings of the model. With the variable importance method, we can understand which attributes more important in the predictions of random forest model. This information is useful in fraud analytics, for auto insurance claims analytics in this case, it is important to gain insights from the fraud detection model to prevent fraud case in the future. For example, from variable importance result of the random forest model, the ‘incidient_severity’ attribute is important in the predictions, and 67% of the fraud case with ‘incidient_severity = Major Damage’, therefore researcher can look further in this attribute for future fraud detection, they can set the conditions for the insurance claims system, if the conditions are meet then the system might give red flag or alerts to the company, so that insurers can hold the case from their customers for the moment and perform further investigations on the claim. And with these interpretabilities from the fraud detection model, the company can also explain and justify their decisions to their customer. 
+
+The training process of random process are much simpler, and less training time are required than the training of neural network. For auto insurance dataset, like this dataset, there are often only tabular data, with the use of random forest model, the training process is much simpler than neural network. Also, parameter tuning is not an easy task for neural network model, there is no specific rule for determining the hyperparameters in the neural network (e.g. number of neutrons in each layer), an appropriate model with good results need to be achieved through trial and error and experiences for different combinations of hyperparameters. Moreover, it takes time to find a better neural network model, in this case, the checking with error rate versus the training epoch is performed to find the best number of iterations that comes with smallest error via the iterative optimization, times are needed to go through iterations and the corresponding calculations. And training time for random forest model in this case is faster and less computationally intensive than neural network. For example, for larger insurance company will have larger auto claims insurance dataset. To deal with larger size of dataset, the training process of neural network model will be much longer, and the hardware dependence is also a problem to deal with the computational power required from the model.
+
+Therefore, it is concluded that the Random Forest Model is more suitable for this case than neural network model.
