@@ -1,5 +1,5 @@
 ---
-title: "RF-NN-Model-for-AutoInsuranceClaims-FraudDetection"
+title: "Random Forest vs Neural Network Model for Auto Insurance Claims Fraud Detection"
 knit: (function(input_file, encoding) {
   out_dir <- 'docs';
   rmarkdown::render(input_file,
@@ -9,10 +9,10 @@ output: html_document
 date: '2022-08-28'
 ---
 
-The Auto Insurance Claims Dataset is from:
+The source of Auto Insurance Claims Dataset:
 https://www.kaggle.com/buntyshah/auto-insurance-claims-data
 
-## 1. Objective
+## 1. Objectives
 * to develop two fraud detection models (Random Forest, Neural Network) for Auto Insurance Claims
 * to evaluate and compare their corresponding results using model performance metrics
 
