@@ -1,5 +1,10 @@
 ---
 title: "RF-NN-Model-for-AutoInsuranceClaims-FraudDetection"
+knit: (function(input_file, encoding) {
+  out_dir <- 'docs';
+  rmarkdown::render(input_file,
+    encoding=encoding,
+    output_file=file.path(dirname(input_file), out_dir, 'index.html'))})
 output: html_document
 date: '2022-08-28'
 ---
@@ -12,6 +17,9 @@ https://www.kaggle.com/buntyshah/auto-insurance-claims-data
 * to evaluate and compare their corresponding results using model performance metrics
 
 ```{r}
+r = getOption("repos")
+r["CRAN"] = "http://cran.us.r-project.org"
+options(repos = r)
 library(readr)
 library(dplyr)
 library(devtools)
