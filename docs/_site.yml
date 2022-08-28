@@ -1,0 +1,10 @@
+name: "Auto Insurance Claims Fraud Detection"
+  output_dir: "docs"
+  navbar:
+    title: "Auto Insurance Claims Fraud Detection"
+    left:
+    - text: "R Markdown"
+        href: index.html
+  output:
+    html_document:
+      theme: cosmo
